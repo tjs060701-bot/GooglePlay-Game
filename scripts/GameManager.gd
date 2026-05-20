@@ -96,6 +96,11 @@ func spend_roll() -> void:
 	state_changed.emit()
 
 
+func grant_bonus_rolls(n: int) -> void:
+	rolls_remaining += n
+	state_changed.emit()
+
+
 func can_roll() -> bool:
 	return rolls_remaining > 0
 
