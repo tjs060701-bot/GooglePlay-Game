@@ -1,0 +1,23 @@
+; Engine configuration file.
+; It's best edited using the editor.
+; https://docs.godotengine.org/en/stable/tutorials/editor/project_settings.html
+
+config_version=5
+
+[application]
+
+config/name="RogueliteDice"
+config/description="Balatro x Dicero roguelite"
+config/version="0.1.0"
+config/tags=[]
+config/features=PackedStringArray("4.2", "Forward Plus")
+config/icon="res://icon.svg"
+run/main_scene="res://scenes/CombatScene.tscn"
+
+[autoload]
+
+GameManager="*res://scripts/GameManager.gd"
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
