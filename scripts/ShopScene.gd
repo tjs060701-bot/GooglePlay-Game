@@ -23,6 +23,7 @@ const COST_D6_TO_D12 := 8
 
 # 3 rune instances offered this visit; null = already purchased.
 var _offered: Array = []
+var _reroll_count: int = 0   # tracks escalating reroll cost this visit
 
 # UI references
 var _lbl_hp:           Label
@@ -31,6 +32,7 @@ var _lbl_next:         Label
 var _lbl_curse:        Label
 var _lbl_pool:         Label
 var _lbl_equip_header: Label
+var _reroll_btn:       Button
 var _shop_hbox:        HBoxContainer
 var _dice_hbox:        HBoxContainer
 var _equip_hbox:       HBoxContainer
@@ -73,6 +75,16 @@ func _build_scene() -> void:
 	# ── Rune shop ──
 	var shop_title := _lbl("— SHOP —", outer, 22)
 	shop_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	_gap_v(outer, 4)
+
+	var reroll_c := CenterContainer.new()
+	outer.add_child(reroll_c)
+	_reroll_btn = Button.new()
+	_reroll_btn.custom_minimum_size = Vector2(190, 32)
+	_reroll_btn.add_theme_font_size_override("font_size", 13)
+	_reroll_btn.pressed.connect(_on_reroll_pressed)
+	reroll_c.add_child(_reroll_btn)
 
 	_gap_v(outer, 4)
 
@@ -179,10 +191,12 @@ func _refresh_ui() -> void:
 		GameManager.blind_name(), GameManager.current_ante, thresh
 	]
 
-	if GameManager.boss_curse == "RollCap":
-		_lbl_curse.text = "WARNING: Boss Blind — ROLL CAP active (3 dice max)"
-	else:
-		_lbl_curse.text = ""
+	var curse_desc := GameManager.boss_curse_description()
+	_lbl_curse.text = "WARNING: BOSS CURSE — %s" % curse_desc if curse_desc else ""
+
+	var reroll_cost := 2 + _reroll_count
+	_reroll_btn.text = "Reroll Offers  (%dg)" % reroll_cost
+	_reroll_btn.disabled = GameManager.gold < reroll_cost
 
 	_lbl_pool.text = "Pool: " + " ".join(
 		GameManager.dice_pool.map(func(d): return "d%d" % d.get("sides", 6))
@@ -307,6 +321,15 @@ func _rebuild_dice_upgrades() -> void:
 		_dice_hbox.add_child(btn)
 		if i < options.size() - 1:
 			_gap_h(_dice_hbox, 14)
+
+
+func _on_reroll_pressed() -> void:
+	var cost := 2 + _reroll_count
+	if GameManager.gold < cost:
+		return
+	_roll_shop()
+	_reroll_count += 1
+	GameManager.spend_gold(cost)   # emits state_changed → _refresh_ui shows fresh offers
 
 
 func _buy_add_die(sides: int, cost: int) -> void:

@@ -18,9 +18,15 @@ var equipped_runes: Array = []   # Array[Rune]
 
 # ── Combat tracking ────────────────────────────────────────────────────────────
 var blind_threshold: int = 0
-var boss_curse: String = ""       # "RollCap" on Boss Blind, else ""
+var boss_curse: String = ""
 var damage_dealt_this_combat: int = 0
 var last_run_stats: Dictionary = {}
+
+# ── Boss curse pool (one picked at random each Boss Blind) ─────────────────────
+const BOSS_CURSES: Array[String] = ["RollCap", "BloodTax", "GoldFrost", "TwinThreat"]
+
+# ── Event probability (not triggered after Boss Blind clears) ──────────────────
+const EVENT_CHANCE: float = 0.40
 
 # ── Signals ────────────────────────────────────────────────────────────────────
 signal state_changed()
@@ -50,7 +56,7 @@ func _refresh_blind() -> void:
 	blind_threshold = _threshold(current_ante, current_blind)
 	rolls_remaining = max_rolls
 	damage_dealt_this_combat = 0
-	boss_curse = "RollCap" if current_blind == 3 else ""
+	boss_curse = BOSS_CURSES[randi() % BOSS_CURSES.size()] if current_blind == 3 else ""
 	state_changed.emit()
 
 
@@ -75,6 +81,15 @@ func blind_name() -> String:
 func active_dice_count() -> int:
 	var cap := 3 if boss_curse == "RollCap" else dice_pool.size()
 	return min(cap, dice_pool.size())
+
+
+func boss_curse_description() -> String:
+	match boss_curse:
+		"RollCap":    return "Roll Cap — only 3 dice active"
+		"BloodTax":   return "Blood Tax — each roll costs 1 HP"
+		"GoldFrost":  return "Gold Frost — no gold can be earned"
+		"TwinThreat": return "Twin Threat — enemy advances twice per turn"
+		_:            return ""
 
 
 ## Returns the threshold for the *next* blind (-1 if the run would end).
@@ -117,6 +132,11 @@ func take_damage(amount: int) -> void:
 	state_changed.emit()
 	if player_hp <= 0:
 		_end_run(false)
+
+
+func heal(amount: int) -> void:
+	player_hp = mini(player_hp + amount, max_player_hp)
+	state_changed.emit()
 
 
 # ── Economy ────────────────────────────────────────────────────────────────────
@@ -185,10 +205,10 @@ func upgrade_die_sides(from_sides: int, to_sides: int) -> void:
 
 ## Call this when the player meets the blind threshold.
 func combat_victory() -> void:
-	# Let economy runes pay out
 	for rune in equipped_runes:
 		var g: int = rune.on_combat_end(damage_dealt_this_combat, blind_threshold)
-		if g > 0:
+		# GoldFrost blocks end-of-combat gold payouts too.
+		if g > 0 and boss_curse != "GoldFrost":
 			add_gold(g)
 	_advance_blind()
 
@@ -202,12 +222,21 @@ func _advance_blind() -> void:
 		_end_run(true)
 		return
 	_refresh_blind()
-	get_tree().change_scene_to_file("res://scenes/ShopScene.tscn")
+	# Boss Blind clears (current_blind wraps to 1) always go straight to shop.
+	# Other clears have a chance of triggering an event first.
+	if current_blind != 1 and randf() < EVENT_CHANCE:
+		get_tree().change_scene_to_file("res://scenes/EventScene.tscn")
+	else:
+		get_tree().change_scene_to_file("res://scenes/ShopScene.tscn")
 
 
 func proceed_to_combat() -> void:
 	_refresh_blind()
 	get_tree().change_scene_to_file("res://scenes/CombatScene.tscn")
+
+
+func proceed_to_shop() -> void:
+	get_tree().change_scene_to_file("res://scenes/ShopScene.tscn")
 
 
 func _end_run(won: bool) -> void:

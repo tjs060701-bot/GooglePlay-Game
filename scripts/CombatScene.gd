@@ -260,10 +260,8 @@ func _refresh_ui() -> void:
 	_lbl_blind.text = "%s  —  Ante %d"   % [GameManager.blind_name(), GameManager.current_ante]
 	_lbl_rolls.text = "Rolls  %d"         % GameManager.rolls_remaining
 
-	if GameManager.boss_curse == "RollCap":
-		_lbl_curse.text = "BOSS CURSE: ROLL CAP  (3 dice max)"
-	else:
-		_lbl_curse.text = ""
+	var curse_desc := GameManager.boss_curse_description()
+	_lbl_curse.text = "BOSS CURSE: %s" % curse_desc if curse_desc else ""
 
 	var dealt  := GameManager.damage_dealt_this_combat
 	var thresh := GameManager.blind_threshold
@@ -350,6 +348,13 @@ func _on_roll_pressed() -> void:
 	_log_rtl.clear()
 	_lbl_chips_mult.text = ""
 
+	# BloodTax: pay 1 HP to roll.
+	if GameManager.boss_curse == "BloodTax":
+		_log_rtl.append_text("[color=#ff4444]Blood Tax: −1 HP[/color]\n")
+		GameManager.take_damage(1)
+		if GameManager.player_hp <= 0:
+			return
+
 	var ctx := _roller.roll(GameManager.dice_pool, GameManager.active_dice_count())
 
 	# Show raw values immediately on the dice
@@ -431,8 +436,11 @@ func _finish_resolution() -> void:
 	]
 
 	if ctx.gold_earned > 0:
-		GameManager.add_gold(ctx.gold_earned)
-		_log_rtl.append_text("[color=#66dd88]+%d Gold[/color]\n" % ctx.gold_earned)
+		if GameManager.boss_curse == "GoldFrost":
+			_log_rtl.append_text("[color=#666666]Gold Frost: %dg blocked[/color]\n" % ctx.gold_earned)
+		else:
+			GameManager.add_gold(ctx.gold_earned)
+			_log_rtl.append_text("[color=#66dd88]+%d Gold[/color]\n" % ctx.gold_earned)
 
 	# Victory check.
 	if GameManager.damage_dealt_this_combat >= GameManager.blind_threshold:
@@ -451,8 +459,10 @@ func _finish_resolution() -> void:
 # ── Enemy turn ─────────────────────────────────────────────────────────────────
 
 func _do_enemy_turn() -> void:
-	_log_rtl.append_text("[color=#ff6666]Enemy advances![/color]\n")
-	_enemy_x -= ENEMY_MOVE_DIST
+	var move := ENEMY_MOVE_DIST * 2 if GameManager.boss_curse == "TwinThreat" else ENEMY_MOVE_DIST
+	var suffix := "  [color=#ff8800](×2 Twin Threat)[/color]" if GameManager.boss_curse == "TwinThreat" else ""
+	_log_rtl.append_text("[color=#ff6666]Enemy advances!%s[/color]\n" % suffix)
+	_enemy_x -= move
 
 	var tween := create_tween()
 	tween.set_ease(Tween.EASE_IN_OUT)
