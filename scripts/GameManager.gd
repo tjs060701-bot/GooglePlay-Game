@@ -138,7 +138,7 @@ func spend_gold(amount: int) -> bool:
 # ── Rune management ────────────────────────────────────────────────────────────
 
 func equip_rune(rune) -> bool:
-	if equipped_runes.size() >= MAX_RUNES:
+	if rune == null or equipped_runes.size() >= MAX_RUNES:
 		return false
 	equipped_runes.append(rune)
 	rune.on_equip(self)

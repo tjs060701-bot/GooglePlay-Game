@@ -8,11 +8,6 @@ func _init() -> void:
 	cost = 3
 
 
-# apply() intentionally does nothing — payout is at combat end.
-func apply(context: RollContext) -> RollContext:
-	return context
-
-
 func on_combat_end(total_damage: int, blind_threshold: int) -> int:
 	var excess := max(0, total_damage - blind_threshold)
 	return excess / 50

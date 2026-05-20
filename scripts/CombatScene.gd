@@ -41,6 +41,7 @@ var _enemy_hp_lbl: Label
 # ── State ──────────────────────────────────────────────────────────────────────
 var _enemy_x: float = ENEMY_START_X
 var _resolving: bool = false
+var _log_entries_seen: int = 0   # tracks which RollContext log entries have been displayed
 
 
 # ── Lifecycle ──────────────────────────────────────────────────────────────────
@@ -48,7 +49,6 @@ var _resolving: bool = false
 func _ready() -> void:
 	_roller = DiceRoller.new()
 	_resolver = RollResolver.new()
-	_resolver.rune_step_started.connect(_on_step_started)
 	_resolver.rune_step_completed.connect(_on_step_completed)
 	_resolver.resolution_complete.connect(_on_resolution_complete)
 	GameManager.state_changed.connect(_refresh_ui)
@@ -355,21 +355,21 @@ func _on_roll_pressed() -> void:
 	# Show raw values immediately on the dice
 	_show_die_values(ctx.raw_values)
 	_log_rtl.append_text("[color=#aaaaaa]%s[/color]\n" % ctx.log_entries[0])
+	_log_entries_seen = 1
 
 	# RollResolver fires signals synchronously; we collect then animate.
 	_resolver.resolve(ctx, GameManager.equipped_runes)
 
 
-func _on_step_started(_rune_name: String, _idx: int) -> void:
-	pass  # buffered in _on_step_completed
-
-
 func _on_step_completed(rune_name: String, ctx: RollContext) -> void:
+	var notes := ctx.log_entries.slice(_log_entries_seen)
+	_log_entries_seen = ctx.log_entries.size()
 	_pending_steps.append({
 		"rune_name": rune_name,
 		"chips":     ctx.chips,
 		"mult":      ctx.mult,
 		"damage":    ctx.total_damage(),
+		"notes":     notes,
 	})
 
 
@@ -395,6 +395,8 @@ func _animate_step(i: int) -> void:
 			step.rune_name, step.chips, step.mult, step.damage
 		]
 	)
+	for note in step.get("notes", []):
+		_log_rtl.append_text("   [color=#999999]%s[/color]\n" % note)
 
 	get_tree().create_timer(STEP_DELAY).timeout.connect(
 		func(): _animate_step(i + 1), CONNECT_ONE_SHOT
@@ -428,9 +430,9 @@ func _finish_resolution() -> void:
 		ctx.chips, ctx.mult, ctx.total_damage()
 	]
 
-	# Gold earned this roll (e.g. from future per-roll economy runes).
 	if ctx.gold_earned > 0:
 		GameManager.add_gold(ctx.gold_earned)
+		_log_rtl.append_text("[color=#66dd88]+%d Gold[/color]\n" % ctx.gold_earned)
 
 	# Victory check.
 	if GameManager.damage_dealt_this_combat >= GameManager.blind_threshold:

@@ -9,6 +9,5 @@ func _init() -> void:
 
 
 func apply(context: RollContext) -> RollContext:
-	context.gold_earned += 1
-	context.log_entries.append("%s: +1 Gold" % rune_name)
+	context.add_gold(1, rune_name)
 	return context
