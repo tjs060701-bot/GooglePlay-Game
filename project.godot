@@ -12,7 +12,7 @@ config/version="0.1.0"
 config/tags=[]
 config/features=PackedStringArray("4.2", "Forward Plus")
 config/icon="res://icon.svg"
-run/main_scene="res://scenes/CombatScene.tscn"
+run/main_scene="res://scenes/MainMenu.tscn"
 
 [autoload]
 

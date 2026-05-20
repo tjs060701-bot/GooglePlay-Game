@@ -167,6 +167,20 @@ func mark_die_as_glass(index: int) -> void:
 		state_changed.emit()
 
 
+func add_die(sides: int = 6) -> void:
+	dice_pool.append({"sides": sides, "is_glass": false})
+	state_changed.emit()
+
+
+## Upgrades the first die found with from_sides faces to to_sides faces.
+func upgrade_die_sides(from_sides: int, to_sides: int) -> void:
+	for i in range(dice_pool.size()):
+		if dice_pool[i].get("sides", 6) == from_sides:
+			dice_pool[i]["sides"] = to_sides
+			state_changed.emit()
+			return
+
+
 # ── Combat flow ────────────────────────────────────────────────────────────────
 
 ## Call this when the player meets the blind threshold.

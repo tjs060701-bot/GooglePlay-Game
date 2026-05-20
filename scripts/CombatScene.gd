@@ -315,7 +315,8 @@ func _refresh_dice() -> void:
 		lbl.add_theme_font_size_override("font_size", 22)
 		lbl.add_theme_color_override("font_color",
 			Color(0.15, 0.50, 0.80, 1) if is_glass else Color(0.12, 0.08, 0.04, 1))
-		lbl.text = "G" if is_glass else "d6"
+		var sides: int = die_data.get("sides", 6)
+		lbl.text = "G" if is_glass else "d%d" % sides
 		container.add_child(lbl)
 		_die_labels.append(lbl)
 

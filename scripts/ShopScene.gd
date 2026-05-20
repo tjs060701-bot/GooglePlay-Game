@@ -1,4 +1,4 @@
-## ShopScene — browse 3 offered runes, manage equipped runes, proceed to next blind.
+## ShopScene — browse offered runes, upgrade dice, manage equipped runes, proceed.
 extends Node2D
 
 const RUNE_SCRIPTS: Array[String] = [
@@ -8,20 +8,32 @@ const RUNE_SCRIPTS: Array[String] = [
 	"res://scripts/runes/TripleTrigger.gd",
 	"res://scripts/runes/HighTide.gd",
 	"res://scripts/runes/GoldVein.gd",
+	"res://scripts/runes/EvenFlow.gd",
+	"res://scripts/runes/Magpie.gd",
+	"res://scripts/runes/CriticalHit.gd",
+	"res://scripts/runes/Momentum.gd",
 ]
 const SHOP_COST  := 3
 const SELL_PRICE := 1
+
+# Dice upgrade costs
+const COST_ADD_D6   := 4
+const COST_D6_TO_D8 := 5
+const COST_D6_TO_D12 := 8
 
 # 3 rune instances offered this visit; null = already purchased.
 var _offered: Array = []
 
 # UI references
-var _lbl_hp:    Label
-var _lbl_gold:  Label
-var _lbl_next:  Label
-var _shop_hbox: HBoxContainer
-var _equip_hbox: HBoxContainer
+var _lbl_hp:           Label
+var _lbl_gold:         Label
+var _lbl_next:         Label
+var _lbl_curse:        Label
+var _lbl_pool:         Label
 var _lbl_equip_header: Label
+var _shop_hbox:        HBoxContainer
+var _dice_hbox:        HBoxContainer
+var _equip_hbox:       HBoxContainer
 
 
 func _ready() -> void:
@@ -56,34 +68,54 @@ func _build_scene() -> void:
 	root.add_child(outer)
 
 	_build_top_bar(outer)
-	_gap_v(outer, 8)
-
-	# Shop section header
-	var shop_title := _lbl("— SHOP —", outer, 24)
-	shop_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-
 	_gap_v(outer, 6)
 
-	# Shop cards row
+	# ── Rune shop ──
+	var shop_title := _lbl("— SHOP —", outer, 22)
+	shop_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	_gap_v(outer, 4)
+
 	var shop_center := CenterContainer.new()
-	shop_center.custom_minimum_size = Vector2(0, 190)
+	shop_center.custom_minimum_size = Vector2(0, 175)
 	outer.add_child(shop_center)
 
 	_shop_hbox = HBoxContainer.new()
 	_shop_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	shop_center.add_child(_shop_hbox)
 
-	_gap_v(outer, 10)
+	_gap_v(outer, 8)
 
-	# Equipped runes header (updated dynamically)
-	_lbl_equip_header = _lbl("— EQUIPPED RUNES  0 / 5 —", outer, 20)
+	# ── Dice upgrades ──
+	var dice_title := _lbl("— DICE UPGRADES —", outer, 18)
+	dice_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	_gap_v(outer, 4)
+
+	_lbl_pool = _lbl("Pool: d6 d6 d6 d6", outer, 12)
+	_lbl_pool.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_pool.add_theme_color_override("font_color", Color(0.70, 0.70, 0.70, 1))
+
+	_gap_v(outer, 4)
+
+	var dice_center := CenterContainer.new()
+	dice_center.custom_minimum_size = Vector2(0, 52)
+	outer.add_child(dice_center)
+
+	_dice_hbox = HBoxContainer.new()
+	_dice_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	dice_center.add_child(_dice_hbox)
+
+	_gap_v(outer, 8)
+
+	# ── Equipped runes ──
+	_lbl_equip_header = _lbl("— EQUIPPED RUNES  0 / 5 —", outer, 18)
 	_lbl_equip_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	_gap_v(outer, 6)
+	_gap_v(outer, 4)
 
-	# Equip slots row
 	var equip_center := CenterContainer.new()
-	equip_center.custom_minimum_size = Vector2(0, 120)
+	equip_center.custom_minimum_size = Vector2(0, 100)
 	equip_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	outer.add_child(equip_center)
 
@@ -91,9 +123,9 @@ func _build_scene() -> void:
 	_equip_hbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	equip_center.add_child(_equip_hbox)
 
-	_gap_v(outer, 12)
+	_gap_v(outer, 8)
 	_build_footer(outer)
-	_gap_v(outer, 12)
+	_gap_v(outer, 10)
 
 
 func _build_top_bar(parent: Control) -> void:
@@ -101,15 +133,23 @@ func _build_top_bar(parent: Control) -> void:
 	panel.custom_minimum_size = Vector2(0, 64)
 	parent.add_child(panel)
 
+	var vbox := VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	panel.add_child(vbox)
+
 	var hbox := HBoxContainer.new()
 	hbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	panel.add_child(hbox)
+	vbox.add_child(hbox)
 
 	_lbl_hp   = _lbl("HP  3 / 3", hbox, 15)
 	_gap_h(hbox, 28)
 	_lbl_gold = _lbl("Gold  5",   hbox, 15)
 	_gap_h(hbox, 48)
 	_lbl_next = _lbl("Next: Big Blind  —  Ante 1  (need 175)", hbox, 16)
+
+	_lbl_curse = _lbl("", vbox, 12)
+	_lbl_curse.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_curse.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35, 1))
 
 
 func _build_footer(parent: Control) -> void:
@@ -119,7 +159,7 @@ func _build_footer(parent: Control) -> void:
 
 	var btn := Button.new()
 	btn.text = "Proceed to Next Blind"
-	btn.custom_minimum_size = Vector2(280, 64)
+	btn.custom_minimum_size = Vector2(280, 60)
 	btn.add_theme_font_size_override("font_size", 22)
 	btn.pressed.connect(func(): GameManager.proceed_to_combat())
 	hbox.add_child(btn)
@@ -139,12 +179,21 @@ func _refresh_ui() -> void:
 		GameManager.blind_name(), GameManager.current_ante, thresh
 	]
 
-	var equipped_count := GameManager.equipped_runes.size()
+	if GameManager.boss_curse == "RollCap":
+		_lbl_curse.text = "WARNING: Boss Blind — ROLL CAP active (3 dice max)"
+	else:
+		_lbl_curse.text = ""
+
+	_lbl_pool.text = "Pool: " + " ".join(
+		GameManager.dice_pool.map(func(d): return "d%d" % d.get("sides", 6))
+	)
+
 	_lbl_equip_header.text = "— EQUIPPED RUNES  %d / %d —" % [
-		equipped_count, GameManager.MAX_RUNES
+		GameManager.equipped_runes.size(), GameManager.MAX_RUNES
 	]
 
 	_rebuild_shop_cards()
+	_rebuild_dice_upgrades()
 	_rebuild_equip_slots()
 
 
@@ -162,17 +211,17 @@ func _rebuild_shop_cards() -> void:
 
 func _make_shop_card(rune, shop_idx: int) -> Control:
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(190, 170)
+	panel.custom_minimum_size = Vector2(190, 160)
 
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	panel.add_child(vbox)
 
 	if rune == null:
-		_gap_v(vbox, 28)
+		_gap_v(vbox, 30)
 		var sold := _lbl("[ SOLD ]", vbox, 18)
 		sold.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		sold.add_theme_color_override("font_color", Color(0.45, 0.45, 0.45, 1))
+		sold.add_theme_color_override("font_color", Color(0.40, 0.40, 0.40, 1))
 		return panel
 
 	var name_lbl := _lbl(rune.rune_name, vbox, 17)
@@ -200,7 +249,7 @@ func _make_shop_card(rune, shop_idx: int) -> Control:
 	var btn := Button.new()
 	btn.text     = "Buy  (%dg)" % SHOP_COST
 	btn.disabled = not can_buy
-	btn.custom_minimum_size = Vector2(150, 34)
+	btn.custom_minimum_size = Vector2(150, 32)
 	btn.pressed.connect(func(): _buy_rune(shop_idx))
 	var btn_c := CenterContainer.new()
 	btn_c.add_child(btn)
@@ -222,6 +271,54 @@ func _buy_rune(shop_idx: int) -> void:
 	# equip_rune emits state_changed → _refresh_ui fires automatically
 
 
+# ── Dice upgrades ──────────────────────────────────────────────────────────────
+
+func _rebuild_dice_upgrades() -> void:
+	_clear_children(_dice_hbox)
+
+	var has_d6 := GameManager.dice_pool.any(func(d): return d.get("sides", 6) == 6)
+
+	var options := [
+		{
+			"label": "Add d6  (%dg)" % COST_ADD_D6,
+			"can":   GameManager.gold >= COST_ADD_D6,
+			"action": func(): _buy_add_die(6, COST_ADD_D6),
+		},
+		{
+			"label": "d6 → d8  (%dg)" % COST_D6_TO_D8,
+			"can":   GameManager.gold >= COST_D6_TO_D8 and has_d6,
+			"action": func(): _buy_upgrade_die(6, 8, COST_D6_TO_D8),
+		},
+		{
+			"label": "d6 → d12  (%dg)" % COST_D6_TO_D12,
+			"can":   GameManager.gold >= COST_D6_TO_D12 and has_d6,
+			"action": func(): _buy_upgrade_die(6, 12, COST_D6_TO_D12),
+		},
+	]
+
+	for i in range(options.size()):
+		var opt: Dictionary = options[i]
+		var btn := Button.new()
+		btn.text     = opt.label
+		btn.disabled = not opt.can
+		btn.custom_minimum_size = Vector2(155, 42)
+		btn.add_theme_font_size_override("font_size", 14)
+		btn.pressed.connect(opt.action)
+		_dice_hbox.add_child(btn)
+		if i < options.size() - 1:
+			_gap_h(_dice_hbox, 14)
+
+
+func _buy_add_die(sides: int, cost: int) -> void:
+	if GameManager.spend_gold(cost):
+		GameManager.add_die(sides)
+
+
+func _buy_upgrade_die(from_sides: int, to_sides: int, cost: int) -> void:
+	if GameManager.spend_gold(cost):
+		GameManager.upgrade_die_sides(from_sides, to_sides)
+
+
 # ── Equip slots ────────────────────────────────────────────────────────────────
 
 func _rebuild_equip_slots() -> void:
@@ -236,22 +333,22 @@ func _rebuild_equip_slots() -> void:
 
 func _make_equip_slot(slot_idx: int) -> Control:
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(130, 100)
+	panel.custom_minimum_size = Vector2(128, 90)
 
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	panel.add_child(vbox)
 
 	if slot_idx >= GameManager.equipped_runes.size():
-		_gap_v(vbox, 16)
+		_gap_v(vbox, 14)
 		var empty := _lbl("[ empty ]", vbox, 13)
 		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		empty.add_theme_color_override("font_color", Color(0.38, 0.38, 0.38, 1))
+		empty.add_theme_color_override("font_color", Color(0.36, 0.36, 0.36, 1))
 		return panel
 
 	var rune = GameManager.equipped_runes[slot_idx]
 
-	var name_lbl := _lbl(rune.rune_name, vbox, 14)
+	var name_lbl := _lbl(rune.rune_name, vbox, 13)
 	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_lbl.autowrap_mode        = TextServer.AUTOWRAP_WORD_SMART
 
@@ -261,23 +358,18 @@ func _make_equip_slot(slot_idx: int) -> Control:
 	type_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	type_lbl.add_theme_color_override("font_color", _type_color(rune.rune_type))
 
-	_gap_v(vbox, 6)
+	_gap_v(vbox, 5)
 
 	var btn := Button.new()
 	btn.text = "Sell  (1g)"
-	btn.custom_minimum_size = Vector2(110, 28)
+	btn.custom_minimum_size = Vector2(108, 26)
 	btn.add_theme_font_size_override("font_size", 12)
-	btn.pressed.connect(func(): _sell_rune(slot_idx))
+	btn.pressed.connect(func(): GameManager.sell_rune(slot_idx))
 	var btn_c := CenterContainer.new()
 	btn_c.add_child(btn)
 	vbox.add_child(btn_c)
 
 	return panel
-
-
-func _sell_rune(slot_idx: int) -> void:
-	GameManager.sell_rune(slot_idx)
-	# sell_rune → add_gold(1) → state_changed → _refresh_ui
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
